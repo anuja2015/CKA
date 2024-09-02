@@ -1,0 +1,29 @@
+$ kubectl run nginxpod --image nginx --dry-run=client -o yaml > nginx.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: nginxpod
+  name: nginxpod
+spec:
+  containers:
+  - image: nginx
+    name: nginxpod
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+  nodeName: controlplane
+
+$ kubectl apply -f nginx.yaml
+pod/nginxpod created
+$ kubectl get po
+NAME       READY   STATUS              RESTARTS   AGE
+nginxpod   0/1     ContainerCreating   0          4s
+$ kubectl get po
+NAME       READY   STATUS    RESTARTS   AGE
+nginxpod   1/1     Running   0          30s
+$ kubectl get po -o wide
+NAME       READY   STATUS    RESTARTS   AGE   IP            NODE           NOMINATED NODE   READINESS GATES
+nginxpod   1/1     Running   0          36s   192.168.0.4   controlplane   <none>           <none>
