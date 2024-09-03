@@ -575,7 +575,7 @@ __Step1 : label the namespaces__
 
 __Step2 : Create and apply networkpolicy__
 
-### networkpolicy created is saved here as ingress_np_on_ns.yaml.
+### networkpolicy created is saved here as ingress_np_on_ns.yaml under yaml directory.
 
           $ k apply -f np.yaml  
           networkpolicy.networking.k8s.io/db-network-policy created
