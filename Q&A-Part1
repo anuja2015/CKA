@@ -180,6 +180,39 @@
           </body>
           </html>
 
-### 7. 
+### 7. You can find a pod named task-pv-pod in the default namespace, please check the status of the pod and troubleshoot, you can recreate the pod if you want.
+
+        $ k get po
+        NAME          READY   STATUS    RESTARTS   AGE
+        task-pv-pod   0/1     Pending   0          8s
+
+        $ k describe po task-pv-pod
           
+        
+        $ k get pv
+        NAME             CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                   STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+        task-pv-volume   10Gi       RWO            Retain           Bound    default/task-pv-claim   manual         <unset>                          3m9s
+        
+        $ k get pvc
+        NAME            STATUS   VOLUME           CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+        task-pv-claim   Bound    task-pv-volume   10Gi       RWO            manual         <unset>                 2m39s
+        
+
+claim name in the pod definition is wrongly spelled as task-pv-claimm. We will have to correct it and recreate the pod.
+        $ k get pod -o yaml > pod.yaml
+        $ vi pod.yaml
+        
+        $ k delete po task-pv-pod
+        pod "task-pv-pod" deleted
+        
+        $ k apply -f pod.yaml 
+        pod/task-pv-pod created
+        
+        $ k get po 
+        NAME          READY   STATUS              RESTARTS   AGE
+        task-pv-pod   0/1     ContainerCreating   0          7s
+        
+        $ k get po
+        NAME          READY   STATUS    RESTARTS   AGE
+        task-pv-pod   1/1     Running   0          9s
  
