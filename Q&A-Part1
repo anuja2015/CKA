@@ -373,5 +373,56 @@ __Create deployment__
         web-deploy-76cd784444-g665k   1/1     Running   0          26s
         web-deploy-76cd784444-zcgdk   1/1     Running   0          26s
  
+### 10. Create a Kubernetes Pod named "my-busybox" with the busybox:1.31.1 image. The Pod should run a sleep command for 4800 seconds. Verify that the Pod is running in Node01.
+
+        $ k run my-busybox --image busybox:1.31.1 --command sleep 4800
+        pod/my-busybox created
+
+        $ k get po
+        NAME         READY   STATUS    RESTARTS   AGE
+        my-busybox   1/1     Running   0          6s
+
+        $ k get po -o wide
+        NAME         READY   STATUS    RESTARTS   AGE   IP            NODE           NOMINATED NODE   READINESS GATES
+        my-busybox   1/1     Running   0          11s   192.168.0.4   controlplane   <none>           <none>
+
+The pod is scheduled on controlplane and not on node01. There are a few reasons for the pod is not scheduled on worker node
+
+1. Pod may have tolerations
+2. The cluster may have only one mode - master node
+3. The pod may have nodeSelector that matches the master node.
+
+        $ k get nodes
+        NAME           STATUS                     ROLES           AGE   VERSION
+        controlplane   Ready                      control-plane   32d   v1.30.0
+        node01         Ready,SchedulingDisabled   <none>          32d   v1.30.0
+
+Status for node01 is Ready/Scheduling disabled which means the node is in maintainance mode. 
+
+        $ k uncordon node01
+        node/node01 uncordoned
+
+        $ k get nodes
+        NAME           STATUS   ROLES           AGE   VERSION
+        controlplane   Ready    control-plane   32d   v1.30.0
+        node01         Ready    <none>          32d   v1.30.0
+
+        $ k delete po my-busybox
+        pod "my-busybox" deleted
+
+        $ k run my-busybox --image busybox:1.31.1 --command sleep 4800
+        pod/my-busybox created
+        
+        $ k get po
+        NAME         READY   STATUS    RESTARTS   AGE
+        my-busybox   1/1     Running   0          7s
+        
+        $ k get po -o wide
+        NAME         READY   STATUS    RESTARTS   AGE   IP            NODE     NOMINATED NODE   READINESS GATES
+        my-busybox   1/1     Running   0          13s   192.168.1.4   node01   <none>           <none>
+
+### 11. You have a Kubernetes cluster that runs a three-tier web application: a frontend tier (port 80), an application tier (port 8080),and a backend tier (3306). The security team has mandated that the backend tier should only be accessible from the application tier.
+ 
+ 
 
 
