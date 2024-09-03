@@ -506,6 +506,121 @@ We can retry telnet to backend pod from both frontend and application.
 
             ^C
           $ 
+
+### 12. You have a Kubernetes cluster and running pods in multiple namespaces, The security team has mandated that the db pods on Project-a namespace only accessible from the service pods that are running in Project-b namespace.
+
+          $ k get ns
+          NAME                 STATUS   AGE
+          default              Active   32d
+          kube-node-lease      Active   32d
+          kube-public          Active   32d
+          kube-system          Active   32d
+          local-path-storage   Active   32d
+          project-a            Active   9m5s
+          project-b            Active   8m56s
+
+          $ k get pods -n project-a
+          NAME                 READY   STATUS    RESTARTS   AGE
+          db-fcb64695b-87cdz   1/1     Running   0          7m29s
+
+          $ k get pods -n project-b
+          NAME                       READY   STATUS    RESTARTS   AGE
+          service-76cf458b4f-p6x6k   1/1     Running   0          3m17s
+          web-7c56dcdb9b-c2rwl       1/1     Running   0          53s
+
+          $ k get pods -n project-a -o wide
+            NAME                 READY   STATUS    RESTARTS   AGE   IP            NODE     NOMINATED NODE   READINESS GATES
+            db-fcb64695b-87cdz   1/1     Running   0          13m   192.168.1.5   node01   <none>           <none>
+
+          $ k exec service-76cf458b4f-p6x6k -n project-b telnet 192.168.1.5 3306
+            kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+            Connection closed by foreign host.
+            Trying 192.168.1.5...
+            Connected to 192.168.1.5.
+            Escape character is '^]'.
+          
+          $ k exec web-7c56dcdb9b-c2rwl -n project-b -- telnet 192.168.1.5 3306          
+            Trying 192.168.1.5...
+            Connected to 192.168.1.5.
+            Escape character is '^]'.
+            Connection closed by foreign host.
+
+Here ingress network policy has to be applied on namespace project-a to accept communication from only service pods in namespace project-b.
+
+__Step1 : label the namespaces__
+
+          $ k label ns project-a namespace=project-a
+          namespace/project-a labeled
+          $ k label ns project-b namespace=project-b
+          namespace/project-b labeled
+          
+          $ k get ns --show-labels
+          NAME                 STATUS   AGE     LABELS
+          default              Active   32d     kubernetes.io/metadata.name=default
+          kube-node-lease      Active   32d     kubernetes.io/metadata.name=kube-node-lease
+          kube-public          Active   32d     kubernetes.io/metadata.name=kube-public
+          kube-system          Active   32d     kubernetes.io/metadata.name=kube-system
+          local-path-storage   Active   32d     kubernetes.io/metadata.name=local-path-storage
+          project-a            Active   5m5s    kubernetes.io/metadata.name=project-a,namespace=project-a
+          project-b            Active   4m57s   kubernetes.io/metadata.name=project-b,namespace=project-b
+
+          $ k get pods -n project-a --show-labels
+          NAME                 READY   STATUS    RESTARTS   AGE   LABELS
+          db-fcb64695b-98crm   1/1     Running   0          28m   app=db,pod-template-hash=fcb64695b
+          
+          $ k get pods -n project-b --show-labels
+          NAME                       READY   STATUS    RESTARTS   AGE   LABELS
+          service-76cf458b4f-4wsmf   1/1     Running   0          26m   app=service,pod-template-hash=76cf458b4f
+          web-7c56dcdb9b-mssmf       1/1     Running   0          27m   app=web,pod-template-hash=7c56dcdb9b
+
+__Step2 : Create and apply networkpolicy__
+
+### networkpolicy created is saved here as ingress_np_on_ns.yaml.
+
+          $ k apply -f np.yaml  
+          networkpolicy.networking.k8s.io/db-network-policy created
+          $ k get networkpolicies
+          No resources found in default namespace.
+          $ k get networkpolicies -n project-a
+          NAME                POD-SELECTOR   AGE
+          db-network-policy   app=db         16s
+          $ k describe networkpolicies db-network-policy -n project-a
+          Name:         db-network-policy
+          Namespace:    project-a
+          Created on:   2024-09-03 14:15:15 +0000 UTC
+          Labels:       <none>
+          Annotations:  <none>
+          Spec:
+            PodSelector:     app=db
+            Allowing ingress traffic:
+              To Port: <any> (traffic allowed to all ports)
+              From:
+                NamespaceSelector: namespace=project-b
+                PodSelector: app=service
+            Not affecting egress traffic
+            Policy Types: Ingress
+
+__Verification__
+
+          $ k -n project-b exec service-76cf458b4f-4wsmf telnet 192.168.1.4 3306
+          kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+          Trying 192.168.1.4...
+          Connected to 192.168.1.4.
+          Escape character is '^]'.
+          Connection closed by foreign host.
+          $ k -n project-b exec web-7c56dcdb9b-mssmf telnet 192.168.1.4 3306
+          kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+
+
+
+          ^C
+          $ 
+
+
+ 
+
+
+ 
             
  
 
