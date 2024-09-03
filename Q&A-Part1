@@ -215,4 +215,57 @@ claim name in the pod definition is wrongly spelled as task-pv-claimm. We will h
         $ k get po
         NAME          READY   STATUS    RESTARTS   AGE
         task-pv-pod   1/1     Running   0          9s
- 
+
+### 8. Deploy a pod with the following specifications:
+
+### Pod name: web-pod
+### Image: httpd
+### Node: Node01
+### Note: do not modify any settings on master and worker nodes
+
+        $ k run web-pod --image=httpd
+        pod/web-pod created
+
+        $ k get po
+        NAME      READY   STATUS    RESTARTS   AGE
+        web-pod   0/1     Pending   0          3s 
+
+        $ k get po -o yaml > pod1.yaml
+        $ vi pod1.yaml
+
+Add tolerations in the pod definition file.
+        spec:
+          tolerations:
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/node
+              operator: Exists
+
+        $ k delete po web-pod
+        pod "web-pod" deleted
+        $ k apply -f pod1.yaml 
+        pod/web-pod created
+
+        $ k get po
+        NAME      READY   STATUS              RESTARTS   AGE
+        web-pod   0/1     ContainerCreating   0          4s
+        
+        $ k get po
+        NAME      READY   STATUS    RESTARTS   AGE
+        web-pod   1/1     Running   0          12s
+
+        $ k get po -o wide
+        NAME      READY   STATUS    RESTARTS   AGE     IP            NODE     NOMINATED NODE   READINESS GATES
+        web-pod   1/1     Running   0          4m12s   192.168.1.4   node01   <none>           <none>
+
+__Taint a node__
+
+$ k taint nodes controlplane node-role.kubernetes.io/master:NoSchedule
+node/controlplane tainted
+$ k describe node controlplane | grep Taints
+Taints:             node-role.kubernetes.io/master:NoSchedule
+$ k taint nodes node01 node-role.kubernetes.io/node:NoSchedule
+node/node01 tainted
+
+
+### 9. Create a new PersistentVolume named web-pv. It should have a capacity of 2Gi, accessMode ReadWriteOnce hostPath /vol/data and no storageClassName defined. Next create a new PersistentVolumeClaim in Namespace production named web-pvc. It should request 2Gi storage, accessMode ReadWriteOnce and should not define a storageClassName. The PVC should bound to the PV correctly. Finally create a new Deployment web-deploy in Namespace production which mounts that volume at /tmp/web-data. The Pods of that Deployment should be of image nginx:1.14.2
+
