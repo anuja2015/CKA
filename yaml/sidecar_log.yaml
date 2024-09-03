@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: multi-pod
+  name: multi-pod
+spec:
+  containers:
+  - image: nginx:latest
+    imagePullPolicy: Always
+    name: web-pod
+    volumeMounts:
+    - mountPath: /var/log/nginx
+      name: hostpath-volume
+  - image: busybox:1.28
+    name: sidecar
+    volumeMounts:
+    - mountPath: /var/busybox/log
+      name: hostpath-volume
+  volumes:
+  - hostPath:
+      path: /var/volume
+      type: ""
+    name: hostpath-volume

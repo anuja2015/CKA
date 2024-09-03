@@ -616,6 +616,74 @@ __Verification__
           ^C
           $ 
 
+### 13. you can find a pod named multi-pod is running and that is logging to a volume. You need to insert a container into the pod that will also read the logs from using this command "tail -f /var/busybox/log/*. log" specifications given below:
+
+### image: busybox:1.28
+### Name: sidecar
+### volumepath: /var/busybox/log
+
+$ k get po
+NAME        READY   STATUS    RESTARTS   AGE
+multi-pod   1/1     Running   0          18s
+
+$ k get po multi-pod -o yaml > multi.yaml
+$ cp multi.yaml bkup_multi.yaml
+$ vi multi.yaml   
+
+Add the below snippet under containers in the definition file
+
+            - image: busybox:1.28
+                name: sidecar
+                volumeMounts:
+                - mountPath: /var/busybox/log
+                  name: hostpath-volume
+
+Delete the existing pod and recreate the pod using definition file.
+
+          $ k delete po multi-pod 
+          pod "multi-pod" deleted
+          $ k apply -f multi.yaml 
+          pod/multi-pod created
+          $ k get po
+          NAME        READY   STATUS    RESTARTS   AGE
+          multi-pod   2/2     Running   0          3s
+
+          $ curl 192.168.1.5
+          <!DOCTYPE html>
+          <html>
+          <head>
+          <title>Welcome to nginx!</title>
+          <style>
+          html { color-scheme: light dark; }
+          body { width: 35em; margin: 0 auto;
+          font-family: Tahoma, Verdana, Arial, sans-serif; }
+          </style>
+          </head>
+          <body>
+          <h1>Welcome to nginx!</h1>
+          <p>If you see this page, the nginx web server is successfully installed and
+          working. Further configuration is required.</p>
+
+          $ k logs multi-pod -c sidecar
+          ==> /var/busybox/log/access.log <==
+
+          ==> /var/busybox/log/error.log <==
+          2024/09/03 15:58:30 [notice] 1#1: signal 17 (SIGCHLD) received from 28
+          2024/09/03 15:58:30 [notice] 1#1: worker process 28 exited with code 0
+          2024/09/03 15:58:30 [notice] 1#1: exit
+          2024/09/03 16:00:10 [notice] 1#1: using the "epoll" event method
+          2024/09/03 16:00:10 [notice] 1#1: nginx/1.27.1
+          2024/09/03 16:00:10 [notice] 1#1: built by gcc 12.2.0 (Debian 12.2.0-14) 
+          2024/09/03 16:00:10 [notice] 1#1: OS: Linux 5.4.0-131-generic
+          2024/09/03 16:00:10 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576
+          2024/09/03 16:00:10 [notice] 1#1: start worker processes
+          2024/09/03 16:00:10 [notice] 1#1: start worker process 28
+
+          ==> /var/busybox/log/access.log <==
+          192.168.0.0 - - [03/Sep/2024:16:00:59 +0000] "GET / HTTP/1.1" 200 615 "-" "curl/7.68.0" "-"
+
+
+
 
  
 
