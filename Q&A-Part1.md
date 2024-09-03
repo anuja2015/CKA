@@ -622,6 +622,10 @@ __Verification__
 ### Name: sidecar
 ### volumepath: /var/busybox/log
 
+
+![Screenshot 2024-09-03 205728](https://github.com/user-attachments/assets/8d8e86e7-3073-4814-9c36-dcd0043834c9)
+
+
 $ k get po
 NAME        READY   STATUS    RESTARTS   AGE
 multi-pod   1/1     Running   0          18s
