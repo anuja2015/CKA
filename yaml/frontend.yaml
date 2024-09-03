@@ -1,7 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  creationTimestamp: null
   labels:
     tier: frontend
   name: frontend
@@ -13,11 +12,10 @@ spec:
   strategy: {}
   template:
     metadata:
-      creationTimestamp: null
       labels:
         tier: frontend
     spec:
       containers:
       - image: nginx
         name: nginx
-        
+        resources: {}

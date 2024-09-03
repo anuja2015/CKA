@@ -1,7 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  creationTimestamp: null
   labels:
     tier: application
   name: application
@@ -13,12 +12,9 @@ spec:
   strategy: {}
   template:
     metadata:
-      creationTimestamp: null
       labels:
         tier: application
     spec:
       containers:
       - image: nginxinc/nginx-unprivileged
         name: nginx
-        resources: {}
-status: {}
