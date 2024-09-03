@@ -259,13 +259,119 @@ Add tolerations in the pod definition file.
 
 __Taint a node__
 
-$ k taint nodes controlplane node-role.kubernetes.io/master:NoSchedule
-node/controlplane tainted
-$ k describe node controlplane | grep Taints
-Taints:             node-role.kubernetes.io/master:NoSchedule
-$ k taint nodes node01 node-role.kubernetes.io/node:NoSchedule
-node/node01 tainted
+        $ k taint nodes controlplane node-role.kubernetes.io/master:NoSchedule
+        node/controlplane tainted
+        $ k describe node controlplane | grep Taints
+        Taints:             node-role.kubernetes.io/master:NoSchedule
+        $ k taint nodes node01 node-role.kubernetes.io/node:NoSchedule
+        node/node01 tainted
 
 
-### 9. Create a new PersistentVolume named web-pv. It should have a capacity of 2Gi, accessMode ReadWriteOnce hostPath /vol/data and no storageClassName defined. Next create a new PersistentVolumeClaim in Namespace production named web-pvc. It should request 2Gi storage, accessMode ReadWriteOnce and should not define a storageClassName. The PVC should bound to the PV correctly. Finally create a new Deployment web-deploy in Namespace production which mounts that volume at /tmp/web-data. The Pods of that Deployment should be of image nginx:1.14.2
+### 9. Create a new PersistentVolume named web-pv. It should have a capacity of 2Gi, accessMode ReadWriteOnce hostPath /vol/data and no storageClassName defined. 
+
+### Next create a new PersistentVolumeClaim in Namespace production named web-pvc. It should request 2Gi storage, accessMode ReadWriteOnce and should not define a storageClassName. The PVC should bound to the PV correctly. 
+
+### Finally create a new Deployment web-deploy in Namespace production which mounts that volume at /tmp/web-data. The Pods of that Deployment should be of image nginx:1.14.2
+
+__Create a PV__
+
+        $ cat pv1.yaml 
+            apiVersion: v1
+            kind: PersistentVolume
+            metadata:
+              name: web-pv
+              labels:
+                type: local
+            spec:
+              capacity:
+                storage: 2Gi
+              accessModes:
+                - ReadWriteOnce
+              hostPath:
+                path: "/vol/data"
+              claimRef:
+                namespace: production
+                name: web-pvc
+
+        $ k apply -f pv1.yaml 
+           persistentvolume/web-pv created
+          
+        $ k get pv
+        NAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+        web-pv   2Gi        RWO            Retain           Available                          <unset>                          2m16s
+
+__Create a PVC__
+
+        $ k create ns production  
+        namespace/production created
+        
+        $ vi pvc.yaml
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              metadata:
+                name: web-pvc
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 2Gi
+
+        $ k apply -f pvc.yaml -n production
+        persistentvolumeclaim/web-pvc created
+
+        $ k get pvc -n production
+        NAME      STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+        web-pvc   Bound    web-pv   2Gi        RWO            local-path     <unset>                 9s
+
+
+__Create deployment__
+
+
+        $ vi web-deploy.yaml
+
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: web-deploy
+                  namespace: production
+                  labels:
+                    app: nginx
+                spec:
+                  replicas: 3
+                  selector:
+                    matchLabels:
+                      app: nginx
+                  template:
+                    metadata:
+                      labels:
+                        app: nginx
+                    spec:
+                      volumes:
+                      - name: web-pv-storage
+                        persistentVolumeClaim:
+                          claimName: web-pvc
+                      containers:
+                      - name: task-pv-container
+                        image: nginx:1.14.2
+                        ports:
+                          - containerPort: 80
+                            name: "http-server"
+                        volumeMounts:
+                          - mountPath: "/tmp/web-data"
+                            name: web-pv-storage
+        $ k apply -f web-deploy.yaml 
+        deployment.apps/web-deploy created
+
+        $ k get deploy -n production
+        NAME         READY   UP-TO-DATE   AVAILABLE   AGE
+        web-deploy   3/3     3            3           16s
+
+        $ k get po -n production
+        NAME                          READY   STATUS    RESTARTS   AGE
+        web-deploy-76cd784444-cblrz   1/1     Running   0          26s
+        web-deploy-76cd784444-g665k   1/1     Running   0          26s
+        web-deploy-76cd784444-zcgdk   1/1     Running   0          26s
+ 
+
 
