@@ -686,6 +686,189 @@ Delete the existing pod and recreate the pod using definition file.
           ==> /var/busybox/log/access.log <==
           192.168.0.0 - - [03/Sep/2024:16:00:59 +0000] "GET / HTTP/1.1" 200 615 "-" "curl/7.68.0" "-"
 
+### 14. Create a CronJob for running every 2 minutes with busybox image. The job name should be my-job and it should print the current date and time to the console. After running the job save any one of the pod logs to below path /root/logs.txt.
+
+
+        $ cat cronjob.yaml 
+          apiVersion: batch/v1
+          kind: CronJob
+          metadata:
+            name: my-job
+          spec:
+            schedule: "*/2 * * * *"
+            jobTemplate:
+              spec:
+                template:
+                  spec:
+                    containers:
+                    - name: my-job
+                      image: busybox:1.28
+                      imagePullPolicy: IfNotPresent
+                      command:
+                      - /bin/sh
+                      - -c
+                      - date; 
+                    restartPolicy: OnFailure
+
+        $ k apply -f cronjob.yaml 
+          cronjob.batch/my-job created
+
+        $ k get po --watch
+        NAME                    READY   STATUS      RESTARTS   AGE
+        my-job-28756942-h75tl   0/1     Completed   0          5s
+        my-job-28756944-c8ljj   0/1     Pending     0          0s
+        my-job-28756944-c8ljj   0/1     Pending     0          0s
+        my-job-28756944-c8ljj   0/1     ContainerCreating   0          0s
+        my-job-28756944-c8ljj   0/1     ContainerCreating   0          0s
+        my-job-28756944-c8ljj   0/1     Completed           0          1s
+        my-job-28756944-c8ljj   0/1     Completed           0          2s
+        my-job-28756944-c8ljj   0/1     Completed           0          2s
+        my-job-28756944-c8ljj   0/1     Completed           0          3s
+        my-job-28756944-c8ljj   0/1     Completed           0          3s
+
+        $ k logs my-job-28756944-c8ljj
+        Wed Sep  4 02:24:00 UTC 2024
+
+        $ touch logs.txt
+        $ k logs my-job-28756944-c8ljj > logs.txt 
+        $ cat logs.txt 
+        Wed Sep  4 02:24:00 UTC 2024
+        $ 
+
+### 15. Find the schedulable nodes in the cluster and save the name and count in to the below file
+
+### File path : /root/nodes.txt
+
+        $ k get nodes
+        NAME           STATUS   ROLES           AGE   VERSION
+        controlplane   Ready    control-plane   32d   v1.30.0
+        node01         Ready    <none>          32d   v1.30.0
+
+        $ k get nodes -o jsonpath='{.items[*].spec.taints}'
+        [{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}] $ 
+
+        $ vi nodes.txt 
+        $ cat nodes.txt 
+        Node_Name= [ node01 ]
+        Node_Count= [ 1  ]
+
+### 16. Please deploy a pod on node01 as per the below specification
+
+### Pod name: web-pod
+### Container name = web
+### image: nginx
+
+        $ k run web-pod --image nginx --dry-run=client -o yaml > web-pod.yaml
+        
+        $ vi web-pod.yaml 
+          apiVersion: v1
+        kind: Pod
+        metadata:
+          creationTimestamp: null
+          labels:
+            run: web-pod
+          name: web-pod
+        spec:
+          containers:
+          - image: nginx
+            name: web
+            resources: {}
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+        status: {}
+
+        $ k apply -f web-pod.yaml 
+        pod/web-pod created
+
+        $ k get po
+        NAME      READY   STATUS    RESTARTS   AGE
+        web-pod   0/1     Pending   0          4s
+
+
+Pod status is in pending due to multiple reasons:
+
+1. Pod is not running on controlplane as it will be tainted to be not schedulable
+2. Pod is not running on node01 as it would be tainted or kubelet will not be running
+3. kubelet on node01 will not be running as kubelet would be stopped or kubelet configuration would be wrong.
+
+        $ k get nodes
+        NAME           STATUS     ROLES           AGE   VERSION
+        controlplane   Ready      control-plane   32d   v1.30.0
+        node01         NotReady   <none>          32d   v1.30.0
+
+Since the question wants the pod to run on node01, we can ignore controlplane.
+Node01 status is NotReady due to kubelet not running or misconfiguration.
+
+
+$ ssh node01
+Last login: Wed Sep  4 03:23:14 2024 from 10.244.7.4
+node01 $ systemctl status kubelet
+● kubelet.service - kubelet: The Kubernetes Node Agent
+     Loaded: loaded (/lib/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+    Drop-In: /usr/lib/systemd/system/kubelet.service.d
+             └─10-kubeadm.conf
+     Active: activating (auto-restart) (Result: exit-code) since Wed 2024-09-04 03:51:04 UTC; 963ms ago
+       Docs: https://kubernetes.io/docs/
+    Process: 9279 ExecStart=/usr/bin/local/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_K>
+   Main PID: 9279 (code=exited, status=203/EXEC)
+
+Sep 04 03:51:04 node01 systemd[1]: kubelet.service: Main process exited, code=exited, status=203/EXEC
+Sep 04 03:51:04 node01 systemd[1]: kubelet.service: Failed with result 'exit-code'.
+lines 1-11/11 (END)
+
+First we will try starting the kubelet service.
+
+node01 $ systemctl start kubelet
+node01 $ systemctl status kubelet
+● kubelet.service - kubelet: The Kubernetes Node Agent
+     Loaded: loaded (/lib/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+    Drop-In: /usr/lib/systemd/system/kubelet.service.d
+             └─10-kubeadm.conf
+     Active: activating (auto-restart) (Result: exit-code) since Wed 2024-09-04 04:07:38 UTC; 9s ago
+       Docs: https://kubernetes.io/docs/
+    Process: 12041 ExecStart=/usr/bin/local/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_>
+   Main PID: 12041 (code=exited, status=203/EXEC)
+
+Sep 04 04:07:38 node01 systemd[1]: kubelet.service: Main process exited, code=exited, status=203/EXEC
+Sep 04 04:07:38 node01 systemd[1]: kubelet.service: Failed with result 'exit-code'.
+lines 1-11/11 (END)
+
+Restart didnt help. Next we will check for kubelet configuration. In the above snippet we see
+
+        ExecStart=/usr/bin/local/kubelet
+
+We check for kubelet in /usr/bin/local
+
+        node01 $ ls -lrt /usr/bin/local/kubelet
+        ls: cannot access '/usr/bin/local': No such file or directory
+
+        node01 $ ls -lrt /usr/bin/kubelet
+        -rwxr-xr-x 1 root root 100100024 Apr 17 18:28 /usr/bin/kubelet
+
+kubelet is in /usr/bin. So we have to correct the configuration.
+ExecStart=/usr/bin/local/kubelet is corrected to ExecStart=/usr/bin/kubelet
+
+        node01 $ cd /usr/lib/systemd/system/kubelet.service.d 
+        node01 $ vi 10-kubeadm.conf
+        node01 $ systemctl daemon-reload
+        node01 $ systemctl start kubelet
+        node01 $ systemctl status kubelet
+        ● kubelet.service - kubelet: The Kubernetes Node Agent
+            Loaded: loaded (/lib/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+            Drop-In: /usr/lib/systemd/system/kubelet.service.d
+                    └─10-kubeadm.conf
+            Active: active (running) since Wed 2024-09-04 04:12:56 UTC; 12s ago
+              Docs: https://kubernetes.io/docs/
+          Main PID: 12996 (kubelet)
+              Tasks: 10 (limit: 2338)
+            Memory: 31.7M
+            CGroup: /system.slice/kubelet.service
+                    └─12996 /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubec>
+
+
+
+
+
 
 
 
