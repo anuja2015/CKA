@@ -927,7 +927,73 @@ ExecStart=/usr/bin/local/kubelet is corrected to ExecStart=/usr/bin/kubelet
           web    1/1     Running   0          10s   192.168.1.4   node01   <none>           <none>
           $ 
 
-### 18
+### 18. There was a security incident where an intruder was able to access the whole cluster from a single hacked web Pod. To prevent this create a NetworkPolicy in default Namespace. It should allow the web -* Pods only to: connect to service -* Pods on port 8080. After implementation, connections from web -* Pods to application -* Pods on port 80 should also be blocked.
+
+          $ k get pods -o wide
+          NAME                       READY   STATUS    RESTARTS   AGE     IP            NODE     NOMINATED NODE   READINESS GATES
+          app-76cf458b4f-dqk88       1/1     Running   0          8m6s    192.168.1.4   node01   <none>           <none>
+          db-fcb64695b-7rhtw         1/1     Running   0          7m53s   192.168.1.7   node01   <none>           <none>
+          service-565ccd4747-8thjb   1/1     Running   0          8m1s    192.168.1.5   node01   <none>           <none>
+          web-7c56dcdb9b-m8qkv       1/1     Running   0          7m56s   192.168.1.6   node01   <none>           <none>
+          $ k exec web-7c56dcdb9b-m8qkv -- telnet 192.168.1.5 8080
+          Trying 192.168.1.5...
+          Connected to 192.168.1.5.
+          Escape character is '^]'.
+          Connection closed by foreign host.
+          $ k exec web-7c56dcdb9b-m8qkv -- telnet 192.168.1.7 3306
+          Trying 192.168.1.7...
+          Connected to 192.168.1.7.
+          Escape character is '^]'.
+          Connection closed by foreign host.
+          $ k exec web-7c56dcdb9b-m8qkv -- telnet 192.168.1.4 80
+          Trying 192.168.1.4...
+          Connected to 192.168.1.4.
+          Escape character is '^]'.
+          Connection closed by foreign host.
+
+          $ k get pods --show-labels
+          NAME                       READY   STATUS    RESTARTS   AGE   LABELS
+          app-76cf458b4f-dqk88       1/1     Running   0          17m   app=service,pod-template-hash=76cf458b4f
+          db-fcb64695b-7rhtw         1/1     Running   0          16m   app=db,pod-template-hash=fcb64695b
+          service-565ccd4747-8thjb   1/1     Running   0          16m   app=service,pod-template-hash=565ccd4747
+          web-7c56dcdb9b-m8qkv       1/1     Running   0          16m   app=web,pod-template-hash=7c56dcdb9b
+
+Notice the labels for app pod and service pod are the same -> app: service. 
+So the network policy will dependent on labels and ports in this case. We have to block communication from web pod to all other pods except service pod. So it is egress network policy to be applied on web pod.
+
+The policy would look like:
+
+        egress:
+          - to:
+            - podSelector:
+                matchLabels:
+                  app: service
+            ports:
+            - protocol: TCP
+              port: 8080
+
+          $ k apply -f egress_np.yaml 
+          networkpolicy.networking.k8s.io/egress-network-policy created
+
+          $ k get networkpolicy
+          NAME                    POD-SELECTOR   AGE
+          egress-network-policy   app=web        96s
+          $ 
+
+__Verification__
+
+          $ k exec web-7c56dcdb9b-m8qkv -- telnet 192.168.1.4 80
+
+          ^C
+          $ k exec web-7c56dcdb9b-m8qkv -- telnet 192.168.1.7 3306
+
+          ^C
+          $ k exec web-7c56dcdb9b-m8qkv -- telnet 192.168.1.5 8080
+          Trying 192.168.1.5...
+          Connected to 192.168.1.5.
+          Escape character is '^]'.
+          Connection closed by foreign host.
+          $ 
 
 
 
