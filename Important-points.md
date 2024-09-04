@@ -20,3 +20,7 @@ __To unjoin a code from the cluster__
                $ exit
         $ kubectl delete node node01 
 
+__To get the number of clusters in kubeconfig__
+
+        $ kubectl config get-clusters
+
