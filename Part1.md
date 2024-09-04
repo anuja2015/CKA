@@ -929,6 +929,9 @@ ExecStart=/usr/bin/local/kubelet is corrected to ExecStart=/usr/bin/kubelet
 
 ### 18. There was a security incident where an intruder was able to access the whole cluster from a single hacked web Pod. To prevent this create a NetworkPolicy in default Namespace. It should allow the web -* Pods only to: connect to service -* Pods on port 8080. After implementation, connections from web -* Pods to application -* Pods on port 80 should also be blocked.
 
+![Screenshot 2024-09-04 152200](https://github.com/user-attachments/assets/22e0b4f4-a993-4f74-8a74-c4fc988f8f8b)
+
+
           $ k get pods -o wide
           NAME                       READY   STATUS    RESTARTS   AGE     IP            NODE     NOMINATED NODE   READINESS GATES
           app-76cf458b4f-dqk88       1/1     Running   0          8m6s    192.168.1.4   node01   <none>           <none>
