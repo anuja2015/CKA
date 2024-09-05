@@ -1,4 +1,59 @@
-### 1. For this question, please set this context (In exam, diff cluster name)
+### Please join node01 worker node to the cluster, and you have to deploy a pod in the node01, pod name should be web and image should be nginx
+
+          $ k get nodes
+          NAME           STATUS   ROLES           AGE   VERSION
+          controlplane   Ready    control-plane   32d   v1.30.0
+          $ kubeadm token create --print-join-command
+          kubeadm join 172.30.1.2:6443 --token zysv9m.1l8oybm3206wtxoj --discovery-token-ca-cert-hash sha256:f5d5f74bd26d6e4311a49a05e4482ddc8cb922dbb08f594c94760fe2e44fc0a5 
+          $ ssh node01
+          Last login: Wed Sep  4 06:01:01 2024 from 10.244.3.176
+          node01 $ systemctl status kubelet
+          ● kubelet.service - kubelet: The Kubernetes Node Agent
+              Loaded: loaded (/lib/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+              Drop-In: /usr/lib/systemd/system/kubelet.service.d
+                      └─10-kubeadm.conf
+              Active: inactive (dead) since Wed 2024-09-04 06:01:08 UTC; 1min 8s ago
+
+          node01 $ kubeadm join 172.30.1.2:6443 --token zysv9m.1l8oybm3206wtxoj --discovery-token-ca-cert-hash sha256:f5d5f74bd26d6e4311a49a05e4482ddc8cb922dbb08f594c94760fe2e44fc0a5
+          [preflight] Running pre-flight checks
+          [preflight] Reading configuration from the cluster...
+          [preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+          [kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+          [kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+          [kubelet-start] Starting the kubelet
+          [kubelet-check] Waiting for a healthy kubelet. This can take up to 4m0s
+          [kubelet-check] The kubelet is healthy after 510.123858ms
+          [kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap
+
+          This node has joined the cluster:
+          * Certificate signing request was sent to apiserver and a response was received.
+          * The Kubelet was informed of the new secure connection details.
+
+          Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+
+          node01 $ exit
+          logout
+          Connection to node01 closed.
+          $ k get nodes
+          NAME           STATUS   ROLES           AGE   VERSION
+          controlplane   Ready    control-plane   32d   v1.30.0
+          node01         Ready    <none>          70s   v1.30.0
+          $ 
+
+          $ k run web --image nginx
+          pod/web created
+         
+          $ k get po
+          NAME   READY   STATUS              RESTARTS   AGE
+          web    0/1     ContainerCreating   0          4s
+          $ k get po -o wide
+          NAME   READY   STATUS    RESTARTS   AGE   IP            NODE     NOMINATED NODE   READINESS GATES
+          web    1/1     Running   0          10s   192.168.1.4   node01   <none>           <none>
+          $ 
+
+
+
+###  For this question, please set this context (In exam, diff cluster name)
 ### kubectl config use-context kubernetes-admin@kubernetes
 
 ### Upgrade controlplane node kubeadm , cluster and kubelet to next version. EXAMPLE: If current version is v1.27.1 then upgrade to v1.27.2
