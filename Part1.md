@@ -680,6 +680,70 @@ ExecStart=/usr/bin/local/kubelet is corrected to ExecStart=/usr/bin/kubelet
           web-pod   1/1     Running   0          30m   192.168.1.4   node01   <none>           <none>
           $ 
 
+### Use Namespace project-1 for the following. 
+### Create a DaemonSet named _daemon-imp_ with image httpd:2.4-alpine and labels id=daemon-imp and uuid=18426a0b-5f59-4e10-923f-c0e078e82462. The Pods it creates should request 20 millicore cpu and 20 mebibyte memory. The Pods of that DaemonSet should run on all nodes, also controlplanes.
+
+$ k get ns
+NAME                 STATUS   AGE
+default              Active   34d
+kube-node-lease      Active   34d
+kube-public          Active   34d
+kube-system          Active   34d
+local-path-storage   Active   34d
+
+$ k create ns project-1
+namespace/project-1 created
+
+$ vi daemon.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemon-imp
+  namespace: project-1
+  labels:
+    id: daemon-imp
+    uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
+spec:
+  selector:
+    matchLabels:
+      name: daemon-imp
+      id: daemon-imp
+      uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
+  template:
+    metadata:
+      labels:
+        name: daemon-imp
+        id: daemon-imp
+        uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
+    spec:
+      tolerations:
+      # these tolerations are to have the daemonset runnable on control plane nodes
+      # remove them if your control plane nodes should not run pods
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: daemon-imp
+        image: httpd:2.4-alpine
+        resources:
+          requests:
+            cpu: 20m
+            memory: 20Mi
+
+$ k apply -f daemon.yaml 
+daemonset.apps/daemon-imp created
+controlplane $ k get daemonset -n project-1
+NAME         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+daemon-imp   2         2         1       2            1           <none>          10s
+
+$ k get po -o wide -n project-1
+NAME               READY   STATUS    RESTARTS   AGE     IP            NODE           NOMINATED NODE   READINESS GATES
+daemon-imp-4mh4s   1/1     Running   0          2m37s   192.168.0.4   controlplane   <none>           <none>
+daemon-imp-xk9tn   1/1     Running   0          2m37s   192.168.1.4   node01         <none>           <none>
+
 
 
 
