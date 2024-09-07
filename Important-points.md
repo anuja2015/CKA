@@ -30,5 +30,14 @@ __To switch to a cluster context__
 
 __To know the number of nodes in a etcd cluster__
 
-$ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/pki/ca.pem --cert=/etc/etcd/pki/etcd.pem --key=/etc/etcd/pki/etcd-key.pem  member list
+        $ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/pki/ca.pem --cert=/etc/etcd/pki/etcd.pem --key=/etc/etcd/pki/etcd-key.pem  member list
+
+__To list the pods sorted by creation time__
+        
+        $ kubectl get pods --sort-by=.metadata.creationTimestamp
+
+__To sort the pods in descending order__
+
+        $ kubectl get pods --sort-by=.metadata.creationTimestamp | tac
+
 
