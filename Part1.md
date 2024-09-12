@@ -435,6 +435,7 @@ Add the below snippet under containers in the definition file
 
             - image: busybox:1.28
                 name: sidecar
+                command: ['sh', '-c', 'tail -f /var/busybox/logs/*.log']
                 volumeMounts:
                 - mountPath: /var/busybox/log
                   name: hostpath-volume
@@ -683,75 +684,285 @@ ExecStart=/usr/bin/local/kubelet is corrected to ExecStart=/usr/bin/kubelet
 ### Use Namespace project-1 for the following. 
 ### Create a DaemonSet named _daemon-imp_ with image httpd:2.4-alpine and labels id=daemon-imp and uuid=18426a0b-5f59-4e10-923f-c0e078e82462. The Pods it creates should request 20 millicore cpu and 20 mebibyte memory. The Pods of that DaemonSet should run on all nodes, also controlplanes.
 
-$ k get ns
-NAME                 STATUS   AGE
-default              Active   34d
-kube-node-lease      Active   34d
-kube-public          Active   34d
-kube-system          Active   34d
-local-path-storage   Active   34d
+          $ k get ns
+          NAME                 STATUS   AGE
+          default              Active   34d
+          kube-node-lease      Active   34d
+          kube-public          Active   34d
+          kube-system          Active   34d
+          local-path-storage   Active   34d
 
-$ k create ns project-1
-namespace/project-1 created
+          $ k create ns project-1
+          namespace/project-1 created
 
-$ vi daemon.yaml
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: daemon-imp
-  namespace: project-1
-  labels:
-    id: daemon-imp
-    uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
-spec:
-  selector:
-    matchLabels:
-      name: daemon-imp
-      id: daemon-imp
-      uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
-  template:
-    metadata:
-      labels:
-        name: daemon-imp
-        id: daemon-imp
-        uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
-    spec:
-      tolerations:
-      # these tolerations are to have the daemonset runnable on control plane nodes
-      # remove them if your control plane nodes should not run pods
-      - key: node-role.kubernetes.io/control-plane
-        operator: Exists
-        effect: NoSchedule
-      - key: node-role.kubernetes.io/master
-        operator: Exists
-        effect: NoSchedule
-      containers:
-      - name: daemon-imp
-        image: httpd:2.4-alpine
-        resources:
-          requests:
-            cpu: 20m
-            memory: 20Mi
+          $ vi daemon.yaml
+          apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: daemon-imp
+            namespace: project-1
+            labels:
+              id: daemon-imp
+              uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
+          spec:
+            selector:
+              matchLabels:
+                name: daemon-imp
+                id: daemon-imp
+                uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
+            template:
+              metadata:
+                labels:
+                  name: daemon-imp
+                  id: daemon-imp
+                  uuid: 18426a0b-5f59-4e10-923f-c0e078e82462
+              spec:
+                tolerations:
+                # these tolerations are to have the daemonset runnable on control plane nodes
+                # remove them if your control plane nodes should not run pods
+                - key: node-role.kubernetes.io/control-plane
+                  operator: Exists
+                  effect: NoSchedule
+                - key: node-role.kubernetes.io/master
+                  operator: Exists
+                  effect: NoSchedule
+                containers:
+                - name: daemon-imp
+                  image: httpd:2.4-alpine
+                  resources:
+                    requests:
+                      cpu: 20m
+                      memory: 20Mi
 
-$ k apply -f daemon.yaml 
-daemonset.apps/daemon-imp created
-controlplane $ k get daemonset -n project-1
-NAME         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
-daemon-imp   2         2         1       2            1           <none>          10s
+          $ k apply -f daemon.yaml 
+          daemonset.apps/daemon-imp created
+          controlplane $ k get daemonset -n project-1
+          NAME         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+          daemon-imp   2         2         1       2            1           <none>          10s
 
-$ k get po -o wide -n project-1
-NAME               READY   STATUS    RESTARTS   AGE     IP            NODE           NOMINATED NODE   READINESS GATES
-daemon-imp-4mh4s   1/1     Running   0          2m37s   192.168.0.4   controlplane   <none>           <none>
-daemon-imp-xk9tn   1/1     Running   0          2m37s   192.168.1.4   node01         <none>           <none>
-
-
+          $ k get po -o wide -n project-1
+          NAME               READY   STATUS    RESTARTS   AGE     IP            NODE           NOMINATED NODE   READINESS GATES
+          daemon-imp-4mh4s   1/1     Running   0          2m37s   192.168.0.4   controlplane   <none>           <none>
+          daemon-imp-xk9tn   1/1     Running   0          2m37s   192.168.1.4   node01         <none>           <none>
 
 
- 
+### create a replicaset with below specifications
 
+###  Name = web-app
+###  Image= nginx
+###  Replicas= 3
 
- 
+### Please note, there is already a pod running in our cluster named web-frontend, please make sure the total number of pods running in the cluster is not more than 3.
+
+          $ k get pod
+          NAME           READY   STATUS    RESTARTS   AGE
+          web-frontend   1/1     Running   0          21s
+
+          Here what we have to do is , create a replica set and add the existing pod to the replica set. For this we will first check the label of the existing pod.
+
+          $ k get pods --show-labels
+          NAME           READY   STATUS    RESTARTS   AGE     LABELS
+          web-frontend   1/1     Running   0          2m24s   tier=frontend
+
+          $ cat rs.yaml 
+          apiVersion: apps/v1
+          kind: ReplicaSet
+          metadata:
+            name: web-app
+            labels:
+              tier: frontend
+          spec:
+            replicas: 3
+            selector:
+              matchLabels:
+                tier: frontend
+            template:
+              metadata:
+                labels:
+                  tier: frontend
+              spec:
+                containers:
+                - name: web-app
+                  image: nginx
+
+          $ k apply -f rs.yaml 
+          replicaset.apps/web-app created
+
+          $ k get po
+          NAME            READY   STATUS    RESTARTS   AGE
+          web-app-btt8n   1/1     Running   0          15s
+          web-app-ht5hp   1/1     Running   0          15s
+          web-frontend    1/1     Running   0          8m55s
+
+          $ k get rs
+          NAME      DESIRED   CURRENT   READY   AGE
+          web-app   3         3         3       44s
+          
             
  
+### 1. Create a ConfigMap named trauerweide with content tree=trauerweide
+### 2. Create the ConfigMap stored in existing file /root/cm.yaml
+
+          $ k get cm
+          NAME               DATA   AGE
+          kube-root-ca.crt   1      35d
+
+          $ k create cm trauerweide --from-literal tree=trauerweide
+          configmap/trauerweide created
+
+          $ cat cm.yaml 
+          apiVersion: v1
+          data:
+            tree: birke
+            level: "3"
+            department: park
+          kind: ConfigMap
+          metadata:
+            name: birke
+
+          $ k apply -f cm.yaml 
+          configmap/birke created
+
+### 1. Create a Podnamed pod1 of image nginx:alpine
+### 2. Make key tree of ConfigMap trauerweide available as environment variable TREE1
+### 3. Test env+volume access in the running Pod
+
+          $ cat pod1.yaml 
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            creationTimestamp: null
+            labels:
+              run: pod1
+            name: pod1
+          spec:
+            containers:
+            - image: nginx:alpine
+              name: pod1
+              resources: {}
+              env:
+              - name: TREE1
+                valueFrom:
+                  configMapKeyRef:
+                    name: trauerweide
+                    key: tree
+            dnsPolicy: ClusterFirst
+            restartPolicy: Always
+          status: {}
+
+          $ k exec -it pod1 -- printenv
+          PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          HOSTNAME=pod1
+          NGINX_VERSION=1.27.1
+          PKG_RELEASE=1
+          DYNPKG_RELEASE=2
+          NJS_VERSION=0.8.5
+          NJS_RELEASE=1
+          TREE1=trauerweide
+
+### 3. Mount all keys of ConfigMap birke as volume. The files should be available under /etc/birke/*
+
+        $ k exec -it pod1 -- sh
+        / # cd /etc/
+        /etc # ls -lrt
+        drwxrwxrwx    3 root     root          4096 Sep  7 09:28 birke
+
+        $ cat pod1.yaml
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          creationTimestamp: null
+          labels:
+            run: pod1
+          name: pod1
+        spec:
+          containers:
+          - image: nginx:alpine
+            name: pod1
+            resources: {}
+            env:
+            - name: TREE1
+              valueFrom:
+                configMapKeyRef:
+                  name: trauerweide
+                  key: tree
+            volumeMounts:
+              - mountPath: /etc/birke
+                name: birke
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+          volumes:
+            - name: birke
+              configMap:
+                name: birke
 
 
+### Create a Static pod with below specification, and it should run on node01
+
+### Name: Staticpod
+### Image : redis
+
+
+          $ ssh node01
+          Last login: Sun Nov 13 17:27:09 2022 from 10.48.0.33
+          node01 $ ps -ef | grep kubelet
+          root         592       1  0 09:05 ?        00:00:11 /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.9 --container-runtime-endpoint unix:///run/containerd/containerd.sock --cgroup-driver=systemd --eviction-hard imagefs.available<5%,memory.available<100Mi,nodefs.available<5% --fail-swap-on=false
+          root       10525   10465  0 09:32 pts/0    00:00:00 grep --color=auto kubelet
+          node01 $ cat /var/lib/kubelet/config.yaml
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          authentication:
+            anonymous:
+              enabled: false
+            webhook:
+              cacheTTL: 0s
+              enabled: true
+            x509:
+              clientCAFile: /etc/kubernetes/pki/ca.crt
+          authorization:
+            mode: Webhook
+            webhook:
+              cacheAuthorizedTTL: 0s
+              cacheUnauthorizedTTL: 0s
+          cgroupDriver: systemd
+          clusterDNS:
+          - 10.96.0.10
+          clusterDomain: cluster.local
+          containerRuntimeEndpoint: ""
+          cpuManagerReconcilePeriod: 0s
+          evictionPressureTransitionPeriod: 0s
+          fileCheckFrequency: 0s
+          healthzBindAddress: 127.0.0.1
+          healthzPort: 10248
+          httpCheckFrequency: 0s
+          imageMaximumGCAge: 0s
+          imageMinimumGCAge: 0s
+          kind: KubeletConfiguration
+          logging:
+            flushFrequency: 0
+            options:
+              json:
+                infoBufferSize: "0"
+              text:
+                infoBufferSize: "0"
+            verbosity: 0
+          memorySwap: {}
+          nodeStatusReportFrequency: 0s
+          nodeStatusUpdateFrequency: 0s
+          resolvConf: /run/systemd/resolve/resolv.conf
+          rotateCertificates: true
+          runtimeRequestTimeout: 0s
+          shutdownGracePeriod: 0s
+          shutdownGracePeriodCriticalPods: 0s
+          staticPodPath: /etc/kubernetes/manifests
+          streamingConnectionIdleTimeout: 0s
+          syncFrequency: 0s
+          volumeStatsAggPeriod: 0s
+          node01 $ 
+
+          $ k run staticpod --image redis --dry-run=client -o yaml > staticpod.yaml
+          $ scp staticpod.yaml node01:/etc/kubernetes/manifests/
+          staticpod.yaml   
+
+          $ k get po
+          NAME               READY   STATUS    RESTARTS   AGE
+          staticpod-node01   1/1     Running   0          37s
